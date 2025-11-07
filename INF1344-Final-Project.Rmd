@@ -1,0 +1,126 @@
+---
+title: "Final Project"
+authors: "Group 4"
+date: "2025-11-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import packages
+```{r, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(kableExtra)
+library(janitor)
+library(broom)
+library(lmtest)
+library(stringr)
+```
+
+# Read in the file
+```{r}
+dat <- read.csv('traffic-collisions-4326')
+
+# display top 6 rows
+head(dat)
+```
+# Clean column names
+```{r}
+# use clean_names to clean up column names
+dat_clean <- clean_names(dat)
+
+
+# display top 6 rows
+head(dat_clean)
+```
+
+
+
+# Clean Date Column
+```{r}
+# convert OCC_Date from Unix time stamp to standard date
+
+# Convert milliseconds to seconds
+date_s <- dat_clean$occ_date / 1000
+
+# Convert to Date (drops the time)
+date <- as.Date(as.POSIXct(date_s, origin = "1970-01-01", tz = "UTC"))
+
+# assign to new date column
+dat_clean$date <- date
+
+# remove occ_date
+subset(dat_clean, select = -occ_date)
+
+# display top 6 rows
+head(dat_clean)
+
+```
+
+# Remove codes from neighborhood_158 and create new coloumn
+```{r}
+dat_clean$neighbourhood <- gsub("\\s*\\([^\\)]+\\)", "", dat_clean$neighbourhood_158)
+
+# remove original neighborhood_158 column
+dat_clean <- subset(dat_clean, select = -neighbourhood_158)
+
+#display top 6 rows
+head(dat_clean)
+```
+
+
+
+# Recode binary variables to numeric
+```{r}
+dat_recoded <- dat_clean %>%
+  mutate(across(c(injury_collisions, ftr_collisions, pd_collisions, automobile, motorcycle, passenger, bicycle, pedestrian),
+                ~case_when(
+                    .=="YES" ~ 1,
+                    .=="NO" ~ 0,
+                    is.na(.) ~ 0, # assign 0 to NA values
+      )))
+
+
+
+# recode fatalities column to set blank columns to 0
+dat_recoded$fatalities[is.na(dat_recoded$fatalities)] <- 0
+
+head(dat_recoded)
+
+#fatalities,injury_collisions,ftr_collisions,pd_collisions,automobile,motorcycle,passenger,bicycle,pedestrian
+```
+
+# Create Final Dataset
+```{r}
+
+# rename columns
+dat_renamed <- dat_recoded %>%
+  rename(
+    id = x_id,
+    month = occ_month,
+    day = occ_dow,
+    year = occ_year,
+    hour = occ_hour
+  )
+
+# final dataframe
+
+dat_final <- subset(dat_renamed, select = c(id, date, day, month, year, hour,
+                    neighbourhood, long_wgs84, lat_wgs84,
+                    fatalities, injury_collisions, ftr_collisions,
+                    pd_collisions, automobile, motorcycle, passenger, bicycle,
+                    pedestrian))
+
+head(dat_final)
+
+```
+
+- Time and date data is first, followed by location data, then type of collision
+- ftr : fail to remain collision
+- pd : property damage collision
+
+
+

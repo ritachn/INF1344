@@ -333,6 +333,109 @@ ggplot(scatter_fatal, aes(x = total_injury, y = total_fatalities, label = month)
 ```
 There is a slight positive relation between injury collisions and fatalities. Indicating that collisions that caused injury often led to fatalities.
 
+# --- Hypothesis Testing ---
+```{r}
+# --- Create variables for hypothesis testing ---
+# H1: More collisions happen in the late afternoon (3-5pm)
+dat_final$late_afternoon <- ifelse(dat_final$hour %in% 15:17, 1, 0)
+
+# H2: Collision frequency increases on Friday + Saturday
+dat_final$fri_sat <- ifelse(dat_final$day %in% c("Friday", "Saturday"), 1, 0)
+
+# H3: Poor weather conditions in winter months cause more collisions
+dat_final$winter <- ifelse(dat_final$month %in% c("January", "February", "March"), 1, 0)
+
+
+# --- Chi-Square Tests ---
+# H1:
+table_h1 <- table(dat_final$late_afternoon)
+table_h1
+
+# Expected probability is based on timeframe:
+# 4 hours out of 24 total, p = 3/24
+chisq_h1 <- chisq.test(table_h1, p = c(4/24, 20/24))
+chisq_h1
+
+
+# H2:
+# Expected probability: 2 days out of 7
+table_h2 <- table(dat_final$fri_sat)
+table_h2
+
+chisq_h2 <- chisq.test(table_h2, p = c(2/7, 5/7))
+chisq_h2
+
+
+# H3:
+# Expected probability: 3 winter months out of 12
+table_h3 <- table(dat_final$winter)
+table_h3
+
+chisq_h3 <- chisq.test(table_h3, p = c(3/12, 9/12))
+chisq_h3
+```
+
+H1: The expected collision frequency based on the proportion of hours in our selected window is 12.5% (3 out of 24 hours). Results indicated a significant deviation from the expected distribution: χ²(1) = 2,738,863, p < 0.001. Collisions during 3pm–5pm accounted for 185,629 cases (24.6%), which is nearly double what was expected. This provides strong evidence that collision frequency peaks during the late afternoon hours.
+
+H2: The chi-square test produced a statistic of χ²(1) = 645,171, p < 0.001. The results indicate that Friday and Saturday do not share the same collision frequency distribution as the other days of the week.
+
+H3: This test evaluated whether collision frequencies during the winter months (January, February, and March) differed from those in the non-winter months. The chi-square value was χ²(1) = 987,279, p < 0.001. As with the previous hypotheses, this result shows that the observed number of collisions differed significantly from the expected distribution. 
+
+```{r}
+# --- ANOVA Tests ---
+# We test whether hour, day, or month groups differ in average collision rates.
+
+# H1: Collisions by hour of day
+hourly_daily <- aggregate(list(count = dat_final$hour),
+                          by = list(day = dat_final$day, hour = dat_final$hour),
+                          FUN = length)
+
+# Convert predictors to factors
+hourly_daily$hour <- as.factor(hourly_daily$hour)
+hourly_daily$day <- as.factor(hourly_daily$day)
+
+# Run ANOVA
+anova_hour <- aov(count ~ hour, data = hourly_daily)
+summary(anova_hour)
+
+# H2: Collisions by day of week
+daily_monthly <- aggregate(list(count = dat_final$day),
+                           by = list(month = dat_final$month, day = dat_final$day),
+                           FUN = length)
+
+daily_monthly$day <- as.factor(daily_monthly$day)
+daily_monthly$month <- as.factor(daily_monthly$month)
+
+anova_day <- aov(count ~ day, data = daily_monthly)
+summary(anova_day)
+
+# H3: Collisions by month of year
+monthly_yearly <- aggregate(list(count = dat_final$month),
+                            by = list(year = dat_final$year, month = dat_final$month),
+                            FUN = length)
+
+monthly_yearly$month <- as.factor(monthly_yearly$month)
+monthly_yearly$year <- as.factor(monthly_yearly$year)
+
+anova_month <- aov(count ~ month, data = monthly_yearly)
+summary(anova_month)
+```
+H1: The ANOVA test showed that the hour of the day has significant impact on collision counts (F(23, 144) = 40.7, p < 2e-16). This indicates that collisions vary substantially across the day, confirming that certain hours have consistently higher collision frequencies. 
+
+Conclusion:
+The hypothesis is supported. Collision frequency clearly depends on the hour of the day.
+
+H2: The ANOVA test revealed that the day of the week has significant effect on collision counts (F(6, 77) = 59.77, p < 2e-16). This result confirms that some days of the week experience more collisions than others. These patterns are consistent with expectations that Fridays and Saturdays contribute disproportionately to collision totals.
+
+Conclusion:
+The hypothesis is supported. Collision frequencies differ meaningfully across days of the week.
+
+H3: The ANOVA test produced a non-significant result (F(11, 126) = 1.146, p = 0.332), indicating that collision counts do not vary enough between months to demonstrate a statistically significant pattern. Although winter conditions were expected to increase collisions, the data does not indicate a seasonal impact strong enough to influence overall monthly totals.
+
+Conclusion:
+The hypothesis is not supported. Collision frequency does not differ significantly across months or between winter and non-winter periods.
+
+
 # ---Prep-Regression---
 library(lubridate)
 
